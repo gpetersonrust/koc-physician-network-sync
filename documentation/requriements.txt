@@ -1,0 +1,203 @@
+Here’s a clear, implementation-ready plan with a tightly scoped TODO list based on everything you shared.
+
+# KOC Physician Network Sync — Plan
+
+**Plugin slug:** `koc-physician-network-sync`
+**Sites:**
+
+* **Source of truth:** `KOCOrtho.com`
+* **Consumers:** `KOSCOrtho.com`, `UOSOrtho.com`
+  **Direction:** Pull-only from KOC → KOSC + UOS
+  **Auth & Network:** WordPress Application Passwords + IP allowlists on both ends
+  **Schedule:** Full import once, then incremental sync (time-based; configurable, default ~8h)
+  **Images:** Do not sync headshots or other media; leave inline content links pointing to KOC
+  **Edits:** Consumer sites can still edit, but upstream (KOC) is the default source of truth. A **whitelist admin page** will control fields that are allowed to remain local (default: none whitelisted).
+  **Match/Identity:**
+* Global ID = **UUID** generated and stored on KOC as post meta (`_koc_global_uuid`)
+* Initial match on consumers by **slug + full name + post_type**; if not found, **log** for manual mapping (don’t auto-create on mismatch)
+* After mapping, store `_koc_global_uuid` on consumer posts
+  **CPT:** Consumer sites already have the physician post type; the plugin will write to that CPT’s post content + post meta (ACF-style field names).
+  **Fields:** Preserve **exact ACF field names** as provided (including typos), treat them as canonical. Content is WYSIWYG/Text/Number/Radio/Checkbox fields (not taxonomies).
+  **Deletions/Status:** If unpublished/removed upstream, reflect **downstream** (unpublish or set inactive—see TODO to pick the exact behavior).
+  **Links/Shortcodes:** Leave internal links pointing to KOC; no shortcodes expected.
+
+---
+
+## Data Model (consumer-side meta keys)
+
+* **Identity/meta:**
+
+  * `_koc_global_uuid` (string, UUID)
+  * `_koc_source_updated_at` (ISO8601) or `_koc_source_version` (string/hash)
+  * `_koc_last_synced_at` (ISO8601)
+* **Post content:** copy KOC `post_content` → consumer `post_content` (HTML left intact)
+* **ACF fields (preserve names exactly):**
+  `personal_information (WYSIWYG), last_name (Text), title (Text), social_climb_id (Number), specialty (Checkbox), secondary_specialty (Checkbox), education (WYSIWYG), intership (WYSIWYG), residency (WYSIWYG), felloswhip (WYSIWYG), began_practice_at_koc (Text), board_certification (WYSIWYG), professional_distinctions (WYSIWYG), orthopaedic_specialty (WYSIWYG), office_info (WYSIWYG), office_location (WYSIWYG), appointments_number (Text), administrative_assistant (Text), nurse (Text), professional_interests (Text), teaching_appointments (Text), medical_associations (Text), educational_links (Text), patient_forms (Text), procedures_performed (WYSIWYG), conditions_treated (WYSIWYG), schedule_an_appointment_link (Text), appointment_button_text (Text), affiliation (Radio), affiliation_link (Text), Surgery (Radio), api_name (Text), professional_headshot (Text), uos_embed (WYSIWYG)`
+
+> Note: `professional_headshot` is ignored for sync logic (per your direction) but is still writable if present in upstream payload; we won’t manage media.
+
+---
+
+## API Contract (source site – KOC)
+
+**Base:** `/wp-json/koc-sync/v1`
+
+* `GET /physicians?updated_since=ISO8601&page&per_page`
+
+  * Returns `schema_version`, `data: Physician[]`, `meta: {page, per_page, total, next}`
+* `GET /physicians/{uuid}` (single fetch)
+* **Auth:** Basic auth via Application Passwords; also restrict by IP allowlist
+* **Payload:**
+
+  * `uuid`, `post_type`, `slug`, `post_title`, `post_content`, `updated_at` (ISO)
+  * `acf: { <field_name>: <value> }` (field names exactly as above)
+  * `schema_version: "1"`
+
+---
+
+## Sync Strategy (consumer sites)
+
+1. **Full Import (initial)**
+
+   * Admin triggers “Full Import” → fetch all pages → match by (slug+full name+post_type) → if match, save UUID; if not, log for manual mapping.
+   * Upsert post content + meta; set `_koc_source_updated_at` and `_koc_last_synced_at`.
+2. **Incremental**
+
+   * On schedule (default ~8h, configurable), fetch `updated_since=last_checked`.
+   * For each item: locate by UUID (fallback: match rule); upsert fields.
+3. **Conflict Policy**
+
+   * By default, **source (KOC) wins** for all fields **except** any fields the admin whitelists as “local”.
+   * Implement per-field whitelist (plugin settings) applied during write.
+4. **Deletions/Status**
+
+   * If a KOC physician becomes unpublished/removed: mirror downstream (behavior finalized in TODO).
+
+---
+
+# TODO List (by phase)
+
+## Phase 0 — Project Wiring & Decisions
+
+* [ ] Confirm **consumer CPT slug** (existing post type name) and ensure plugin knows it.
+* [ ] Decide downstream **status policy** on removals: **Unpublish** vs **Inactive meta** (recommend: unpublish).
+* [ ] Confirm settings option names and admin page slugs.
+* [ ] Create a short spec for error codes, log formats, and retention (e.g., 60–90 days).
+
+## Phase 1 — Source Site (KOC) Module
+
+* [ ] Add `_koc_global_uuid` post meta to all physician posts (generate UUID for any missing).
+* [ ] Build **export utility** (admin) to CSV: `uuid, post_type, slug, post_title, full_name (if stored), updated_at` (and optionally a subset of fields) for initial mapping audit.
+* [ ] Implement REST routes:
+
+  * [ ] `GET /wp-json/koc-sync/v1/physicians` with `updated_since`, `page`, `per_page`
+  * [ ] `GET /wp-json/koc-sync/v1/physicians/{uuid}`
+* [ ] Implement **payload composer** (post content + ACF by field name).
+* [ ] Add **schema_version: "1"`** to responses.
+* [ ] Enforce **Application Passwords** (Basic Auth) and **IP allowlist**.
+* [ ] Pagination + server-side limits; include `meta.total` and `meta.next`.
+* [ ] Unit tests for response shape and filtering by `updated_since`.
+* [ ] Admin: show **last N pushes** / API access log (read-only).
+
+## Phase 2 — Consumer Module (KOSC + UOS)
+
+**Settings & Identity**
+
+* [ ] Settings page: **Connection** (Base URL to KOC, username, App Password), IP allowlist note.
+* [ ] Setting: **Sync frequency** (default 8h) and **Run now** button.
+* [ ] Store `koc_sync_last_checked` (option) and per-post `_koc_last_synced_at`.
+* [ ] Store `_koc_global_uuid` and `_koc_source_updated_at` on each mapped post.
+
+**Importer (Full & Incremental)**
+
+* [ ] Full import command: paginated fetch → for each item:
+
+  * [ ] Try **UUID** (if already mapped), else match by **slug+full name+post_type**.
+  * [ ] If no match → **log “unmatched”**; **do not create** automatically.
+  * [ ] If match → write `post_content`, write meta fields by **field name** (ACF-style).
+  * [ ] Honor **whitelist** (skip writing those meta keys and/or post content if whitelisted).
+* [ ] Incremental import: call with `updated_since=koc_sync_last_checked`, repeat logic.
+* [ ] Set `koc_sync_last_checked` at end of successful runs.
+
+**Whitelist Admin**
+
+* [ ] Build **Whitelist page**: multi-select of known fields + “post_content” toggle.
+* [ ] Store whitelist in an option (e.g., `koc_sync_whitelist_fields`).
+* [ ] Apply whitelist during writes (field-level).
+
+**Logging & Errors**
+
+* [ ] Custom table `wp_koc_sync_logs` with fields: `ts`, `site`, `action`, `uuid`, `post_id`, `level (INFO/WARN/ERROR)`, `message`, `context (JSON)`
+* [ ] Write unmatched/mismatched records and failures; surface in admin list + filters.
+* [ ] Retention policy: purge older than N days (setting).
+
+**Scheduler**
+
+* [ ] WP-Cron event registered on activation; adjustable interval.
+* [ ] Manual “Run now” action with nonce + capability checks.
+
+**Write Rules**
+
+* [ ] Update `post_content` (unless whitelisted).
+* [ ] Write meta for **all declared ACF fields** (unless whitelisted).
+* [ ] **Do not** touch images/headshots.
+* [ ] Leave inline links as-is (pointing to KOC).
+
+**Removal Handling**
+
+* [ ] On upstream removal/unpublish:
+
+  * [ ] If policy = **Unpublish**, set post status to `draft` (or custom `inactive`).
+  * [ ] Log the action and timestamp.
+
+## Phase 3 — Initial Migration & Mapping
+
+* [ ] On KOC, generate **UUIDs** where missing and export CSV.
+* [ ] On consumers, run **audit script** (dry-run): attempt match by slug+full name+post_type and report:
+
+  * [ ] matches,
+  * [ ] conflicts (multiple candidates),
+  * [ ] unmatched (needs manual).
+* [ ] Manually fix slugs/titles where needed to enable matching.
+* [ ] Run **Full Import**; verify spot samples against KOC.
+
+## Phase 4 — Incremental Sync Operations
+
+* [ ] Set schedule (8h default).
+* [ ] First incremental run with `updated_since` = last full import timestamp.
+* [ ] Verify that whitelist rules hold and local edits persist where allowed.
+* [ ] Validate logs, confirm noise level is acceptable.
+
+## Phase 5 — Hardening & Safety Nets
+
+* [ ] Add **retry with backoff** for transient network errors.
+* [ ] Add **request timeout** and **page limit** guards.
+* [ ] Add **data validation** layer (types: WYSIWYG/Text/Number/Radio/Checkbox).
+* [ ] Add **diff preview** for “Run now” (optional; can be post-MVP).
+* [ ] Add minimal **health check** page (connectivity, auth, last run status, counts).
+
+## Phase 6 — Staging & Release
+
+* [ ] Environment-aware settings (distinct endpoints/creds for staging vs prod).
+* [ ] Test end-to-end in staging for all three sites.
+* [ ] Create rollout plan (KOC first, then KOSC, then UOS).
+* [ ] Document rollback steps (disable cron, revert last run changes via logs if needed).
+
+## Phase 7 — Documentation
+
+* [ ] README: architecture, settings, fields, whitelist, logs.
+* [ ] Operator guide: how to run Full Import, interpret logs, handle unmatched.
+* [ ] Developer notes: endpoints, payload schema, meta keys, extension points.
+
+---
+
+## Deliverables (MVP Checklist)
+
+* [ ] KOC API endpoints (list + single), auth, IP allowlist, schema v1
+* [ ] Consumer importer (full + incremental) with whitelist, logging, cron
+* [ ] Initial UUID assignment + CSV export tool on KOC
+* [ ] Admin settings (connection, schedule, run now)
+* [ ] Removal policy implemented and tested
+* [ ] Docs for setup/runbook
+
+If you want, I can now drop this into a lightweight GitHub-style issue list or a printable checklist—your call.

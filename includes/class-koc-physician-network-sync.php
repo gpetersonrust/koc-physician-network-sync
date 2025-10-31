@@ -78,6 +78,7 @@ class Koc_Physician_Network_Sync {
 		$this->set_locale();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
+		$this->define_acf_hooks();
 
 	}
 
@@ -121,8 +122,21 @@ class Koc_Physician_Network_Sync {
 		 * side of the site.
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-koc-physician-network-sync-public.php';
+        // require includes/class-koc-physician-network-sync-source.php 
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-source.php';
+
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-acf-manager.php';
+
+
+
+		$sync_source = new KOC_Physician_Network_Sync_Source();
+
+
+		
 
 		$this->loader = new Koc_Physician_Network_Sync_Loader();
+
+		$this->loader->add_action('admin_menu', $sync_source, 'add_plugin_admin_menu');
 
 	}
 
@@ -174,6 +188,19 @@ class Koc_Physician_Network_Sync {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
 	}
+
+	/**
+	 * Register all of the hooks related to ACF functionality.
+	 *
+	 * @since    1.0.0
+	 * @access   private
+	 */
+	private function define_acf_hooks() {
+		$acf_manager = new KOC_Physician_ACF_Manager();
+		$this->loader->add_action( 'acf/init', $acf_manager, 'register_field_groups' );
+	}
+
+
 
 	/**
 	 * Run the loader to execute all of the hooks with WordPress.

@@ -36,6 +36,8 @@ if ( ! defined( 'WPINC' ) ) {
  * Rename this for your plugin and update it as you release new versions.
  */
 define( 'KOC_PHYSICIAN_NETWORK_SYNC_VERSION', '1.0.0' );
+define( 'KOC_PHYSICIAN_NETWORK_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'KOC_PHYSICIAN_NETWORK_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
  * The code that runs during plugin activation.
@@ -57,6 +59,8 @@ function deactivate_koc_physician_network_sync() {
 
 register_activation_hook( __FILE__, 'activate_koc_physician_network_sync' );
 register_deactivation_hook( __FILE__, 'deactivate_koc_physician_network_sync' );
+
+ 
 
 /**
  * The core plugin class that is used to define internationalization,

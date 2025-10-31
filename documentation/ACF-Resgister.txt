@@ -1,0 +1,260 @@
+Overview
+
+This article will discuss how to register fields and field groups via the functions.php file. There are many benefits to using PHP to register fields, the main of which is customization and distribution. The ability to define fields within the theme’s files allows developers to avoid any data loss when working across multiple environments (dev/staging/live). It also reduces calls to the database and can speed up your website.
+
+If you only require a solution for distribution across multiple environments, please familiarize yourself with the local json feature as this solves the issue with minimal effort.
+Link to heading#Getting started
+
+Adding field groups and fields is easy. ACF can even generate the PHP code for you from the Import / Export menu page within the WP dashboard!
+
+👨‍💻 Note: It is important to remember that each field group’s key and each field’s key must be unique. The key is a reference for ACF to find, save and load data. If 2 fields or 2 groups are added using the same key, the later will override the original.
+
+👨‍💻 Note: Field Groups and Fields registered via code will not be visible/editable via the “Edit Field Groups” admin page.
+Link to heading#Functions
+
+Here is a list of functions which will be used in the examples below. You can find these functions and more in the core/local.php file.
+Name 	Description
+acf_add_local_field_group( $field_group ) 	Adds a field group to the local cache
+acf_add_local_field( $field ) 	Adds a field to the local cache
+acf_get_local_field( $key ) 	Get a local field
+acf_remove_local_field( $key ) 	Remove a local field
+Link to heading#Example
+Link to heading#Basic
+
+This example demonstrates how to add a field group.
+Link to heading#functions.php
+
+if( function_exists('acf_add_local_field_group') ):
+
+acf_add_local_field_group(array (
+    'key' => 'group_1',
+    'title' => 'My Group',
+    'fields' => array (
+        array (
+            'key' => 'field_1',
+            'label' => 'Sub Title',
+            'name' => 'sub_title',
+            'type' => 'text',
+            'prefix' => '',
+            'instructions' => '',
+            'required' => 0,
+            'conditional_logic' => 0,
+            'wrapper' => array (
+                'width' => '',
+                'class' => '',
+                'id' => '',
+            ),
+            'default_value' => '',
+            'placeholder' => '',
+            'prepend' => '',
+            'append' => '',
+            'maxlength' => '',
+            'readonly' => 0,
+            'disabled' => 0,
+        )
+    ),
+    'location' => array (
+        array (
+            array (
+                'param' => 'post_type',
+                'operator' => '==',
+                'value' => 'post',
+            ),
+        ),
+    ),
+    'menu_order' => 0,
+    'position' => 'normal',
+    'style' => 'default',
+    'label_placement' => 'top',
+    'instruction_placement' => 'label',
+    'hide_on_screen' => '',
+));
+
+endif;
+
+Link to heading#Minimal
+
+Each field contains many settings which can be removed to minimize your code. In this case ACF will merge in the missing default settings.
+Link to heading#functions.php
+
+if( function_exists('acf_add_local_field_group') ):
+
+acf_add_local_field_group(array(
+    'key' => 'group_1',
+    'title' => 'My Group',
+    'fields' => array (
+        array (
+            'key' => 'field_1',
+            'label' => 'Sub Title',
+            'name' => 'sub_title',
+            'type' => 'text',
+        )
+    ),
+    'location' => array (
+        array (
+            array (
+                'param' => 'post_type',
+                'operator' => '==',
+                'value' => 'post',
+            ),
+        ),
+    ),
+));
+
+endif;
+
+Link to heading#Individual
+
+It is possible to add a field group and field individually. This makes it possible for a field to be defined as a variable and added to multiple field groups. Please note the $field must contain a parent setting which matches the key of either the field group, or another parent field ( repeater / flexible content ).
+Link to heading#functions.php
+
+if( function_exists('acf_add_local_field_group') ):
+
+acf_add_local_field_group(array(
+    'key' => 'group_1',
+    'title' => 'My Group',
+    'fields' => array (),
+    'location' => array (
+        array (
+            array (
+                'param' => 'post_type',
+                'operator' => '==',
+                'value' => 'post',
+            ),
+        ),
+    ),
+));
+
+acf_add_local_field(array(
+    'key' => 'field_1',
+    'label' => 'Sub Title',
+    'name' => 'sub_title',
+    'type' => 'text',
+    'parent' => 'group_1'
+));
+
+endif;
+
+Link to heading#Add within an action
+
+The functions above can be used in the root of the functions.php file or within the acf/init action. This action was added in ACF v5.2.7 and is recommended.
+
+The benefit of using this action is that the function is guaranteed to exist, and won’t run unless ACF is active.
+Link to heading#functions.php
+
+function my_acf_add_local_field_groups() {
+    
+    acf_add_local_field_group(array(
+        'key' => 'group_1',
+        'title' => 'My Group',
+        'fields' => array (
+            array (
+                'key' => 'field_1',
+                'label' => 'Sub Title',
+                'name' => 'sub_title',
+                'type' => 'text',
+            )
+        ),
+        'location' => array (
+            array (
+                array (
+                    'param' => 'post_type',
+                    'operator' => '==',
+                    'value' => 'post',
+                ),
+            ),
+        ),
+    ));
+    
+}
+
+add_action('acf/init', 'my_acf_add_local_field_groups');
+
+Link to heading#Group Settings
+
+Below is a list of available settings for a field group. Please note these settings can be viewed when editing a field group, and exported for minimal effort.
+Link to heading#Group Settings
+
+$group = array(
+    
+    /* (string) Unique identifier for field group. Must begin with 'group_' */
+    'key' => 'group_1',
+    
+    /* (string) Visible in metabox handle */
+    'title' => 'My Group',
+    
+    /* (array) An array of fields */
+    'fields' => array(),
+    
+    /* (array) An array containing 'rule groups' where each 'rule group' is an array containing 'rules'. 
+    Each group is considered an 'or', and each rule is considered an 'and'. */
+    'location' => array(
+        array(
+            array(
+                'param' => 'post_type',
+                'operator' => '==',
+                'value' => 'post',
+            ),
+        ),
+    ),
+    
+    /* (int) Field groups are shown in order from lowest to highest. Defaults to 0 */
+    'menu_order' => 0,
+    
+    /* (string) Determines the position on the edit screen. Defaults to normal. Choices of 'acf_after_title', 'normal' or 'side' */
+    'position' => 'normal',
+    
+    /* (string) Determines the metabox style. Defaults to 'default'. Choices of 'default' or 'seamless' */
+    'style' => 'default',
+    
+    /* (string) Determines where field labels are places in relation to fields. Defaults to 'top'. 
+    Choices of 'top' (Above fields) or 'left' (Beside fields) */
+    'label_placement' => 'top',
+    
+    /* (string) Determines where field instructions are places in relation to fields. Defaults to 'label'. 
+    Choices of 'label' (Below labels) or 'field' (Below fields) */
+    'instruction_placement' => 'label',
+    
+    /* (array) An array of elements to hide on the screen */
+    'hide_on_screen' => '',
+);
+
+Link to heading#Field Settings
+
+Below is a list of available generic settings for a field. In addition to these generic settings, each field is also given field type specific settings which are listed down the page.
+Link to heading#Field Settings
+
+$field = array (
+    
+    /* (string) Unique identifier for the field. Must begin with 'field_' */
+    'key' => 'field_1',
+    
+    /* (string) Visible when editing the field value */
+    'label' => 'Sub Title',
+    
+    /* (string) Used to save and load data. Single word, no spaces. Underscores and dashes allowed */
+    'name' => 'sub_title',
+    
+    /* (string) Type of field (text, textarea, image, etc) */
+    'type' => 'text',
+    
+    /* (string) Instructions for authors. Shown when submitting data */
+    'instructions' => '',
+    
+    /* (int) Whether or not the field value is required. Defaults to 0 */
+    'required' => 0,
+    
+    /* (mixed) Conditionally hide or show this field based on other field's values. 
+    Best to use the ACF UI and export to understand the array structure. Defaults to 0 */
+    'conditional_logic' => 0,
+    
+    /* (array) An array of attributes given to the field element */
+    'wrapper' => array (
+        'width' => '',
+        'class' => '',
+        'id' => '',
+    ),
+    
+    /* (mixed) A default value used by ACF if no value has yet been saved */
+    'default_value' => '',
+);
