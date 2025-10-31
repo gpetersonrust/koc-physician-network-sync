@@ -108,10 +108,10 @@ $admin_manager->load_settings();
         <div class="action-buttons">
             <?php
             $admin_manager->dynamic_post_button(
-                'sync_from_queue',
-                'sync_from_queue',
-                'sync_from_queue',
-                'Sync from Queue'
+                'sync_all_physicians',
+                'sync_all_physicians',
+                'sync_all_physicians',
+                'Sync All Physicians'
             );
             ?>
         </div>
@@ -155,6 +155,21 @@ $admin_manager->load_settings();
     );
     ?>
   </div>
+<?php endif; ?>
+
+<?php if ( ! $admin_manager->child_site_option && ! empty( $admin_manager->queued_physicians ) ) : ?>
+    <div class="sync-queue-list">
+        <h2>Physician Sync Queue</h2>
+        <p>The following physicians have been updated and are in the queue to be synced.</p>
+        <ul>
+            <?php foreach ( $admin_manager->queued_physicians as $post ) : ?>
+                <li>
+                    <?php echo esc_html( $post->post_title ); ?>
+                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=koc-physician-network-sync&action=remove_from_queue&post_id=' . $post->ID ), 'remove_from_queue_' . $post->ID ) ); ?>"> (Remove)</a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
 <?php endif; ?>
 
 

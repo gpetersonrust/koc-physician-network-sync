@@ -8,20 +8,30 @@ class Physician_Network_Sync_Admin_Manager  {
     public $last_update_date;
     public $sync_interval;
     public $parent_url;
+    public $queued_physicians = array();
 
     public function __construct() {
         // Constructor is empty, form handling is hooked into admin_init.
     }
 
     public function handle_form_submissions() {
+        if ( isset( $_GET['action'] ) && $_GET['action'] == 'remove_from_queue' && isset( $_GET['post_id'] ) ) {
+            if ( isset( $_GET['_wpnonce'] ) && wp_verify_nonce( $_GET['_wpnonce'], 'remove_from_queue_' . $_GET['post_id'] ) ) {
+                $post_id_to_remove = (int) $_GET['post_id'];
+                $queue = get_option( 'koc_sync_physician_queue', array() );
+                $queue = array_diff( $queue, array( $post_id_to_remove ) );
+                update_option( 'koc_sync_physician_queue', $queue );
+                wp_redirect( admin_url( 'admin.php?page=koc-physician-network-sync&settings-updated=true' ) );
+                exit;
+            }
+        }
+
         if ( ! isset( $_POST['action'] ) || ! isset( $_GET['page'] ) || $_GET['page'] !== 'koc-physician-network-sync' ) {
             return;
         }
 
-        
-
         if ( $_POST['action'] == 'save_koc_physician_sync_settings' ) {
-            
+          
             $this->save_settings();
         } else {
             $this->proccess_dynamic_post_button();
@@ -35,6 +45,19 @@ class Physician_Network_Sync_Admin_Manager  {
         $this->last_update_date = get_option('koc_physician_sync_last_update_date', '');
         $this->sync_interval = get_option('koc_physician_sync_interval', '8 hours');
         $this->parent_url = get_option('koc_physician_sync_parent_url', '');
+
+        $queued_ids = get_option('koc_sync_physician_queue', array());
+        if ( ! empty( $queued_ids ) ) {
+            $args = array(
+                'post_type' => 'physician',
+                'post__in' => $queued_ids,
+                'posts_per_page' => -1,
+                'orderby' => 'post__in',
+            );
+            $query = new WP_Query( $args );
+            $this->queued_physicians = $query->posts;
+            wp_reset_postdata();
+        }
     }
 
 public function dynamic_post_button($action, $class_function, $nonce_label, $button_text){ ?>
@@ -108,7 +131,7 @@ Action completed successfully.
     wp_reset_postdata();
 }
 
-    public function sync_from_queue() {
+    public function sync_all_physicians() {
         $parent_url = get_option( 'koc_physician_sync_parent_url' );
         $secret_key = get_option( 'koc_physician_sync_secret_key' );
 
@@ -117,67 +140,75 @@ Action completed successfully.
             return;
         }
 
-        $api_url = trailingslashit( $parent_url ) . 'wp-json/koc-sync/v1/physicians/queue';
-
-        $response = wp_remote_get( $api_url, array(
-            'headers' => array(
-                'X-Auth-Secret' => $secret_key,
-                'Referer' => site_url(),
-            ),
-        ));
-
-        if ( is_wp_error( $response ) ) {
-            add_settings_error('koc_sync_settings', 'api_error', 'API Request Error: ' . $response->get_error_message(), 'error');
-            return;
-        }
-
-        $body = wp_remote_retrieve_body( $response );
-        $data = json_decode( $body, true );
-
-        if ( ! isset( $data['data'] ) ) {
-            add_settings_error('koc_sync_settings', 'api_data_error', 'Invalid data received from parent site.', 'error');
-            return;
-        }
-
-        $physicians = $data['data'];
+        $page = 1;
         $updated_count = 0;
 
-        foreach ( $physicians as $physician_data ) {
-            $args = array(
-                'post_type' => 'physician',
-                'meta_query' => array(
-                    array(
-                        'key'   => 'unique_physician_id',
-                        'value' => $physician_data['unique_physician_id'],
-                    ),
+        while( true ) {
+            $api_url = add_query_arg(array('page' => $page), trailingslashit( $parent_url ) . 'wp-json/koc-sync/v1/physicians');
+
+            $response = wp_remote_get( $api_url, array(
+                'headers' => array(
+                    'X-Auth-Secret' => $secret_key,
+                    'Referer' => site_url(),
                 ),
-                'posts_per_page' => 1,
-            );
-            $query = new WP_Query( $args );
+            ));
 
-            if ( $query->have_posts() ) {
-                $query->the_post();
-                $post_id = get_the_ID();
-
-                // Update post data
-                wp_update_post( array(
-                    'ID'           => $post_id,
-                    'post_title'   => $physician_data['post_title'],
-                    'post_content' => $physician_data['post_content'],
-                ) );
-
-                // Update ACF fields
-                foreach ( $physician_data as $key => $value ) {
-                    if ( strpos($key, 'post_') !== 0 && $key !== 'unique_physician_id' ) {
-                        update_field( $key, $value, $post_id );
-                    }
-                }
-                $updated_count++;
+            if ( is_wp_error( $response ) ) {
+                add_settings_error('koc_sync_settings', 'api_error', 'API Request Error: ' . $response->get_error_message(), 'error');
+                return;
             }
-            wp_reset_postdata();
+
+            $body = wp_remote_retrieve_body( $response );
+            $data = json_decode( $body, true );
+
+            if ( ! isset( $data['data'] ) ) {
+                add_settings_error('koc_sync_settings', 'api_data_error', 'Invalid data received from parent site.', 'error');
+                return;
+            }
+
+            $physicians = $data['data'];
+            if ( empty( $physicians ) ) {
+                break; // No more physicians to sync
+            }
+
+            foreach ( $physicians as $physician_data ) {
+                $args = array(
+                    'post_type' => 'physician',
+                    'meta_query' => array(
+                        array(
+                            'key'   => 'unique_physician_id',
+                            'value' => $physician_data['unique_physician_id'],
+                        ),
+                    ),
+                    'posts_per_page' => 1,
+                );
+                $query = new WP_Query( $args );
+
+                if ( $query->have_posts() ) {
+                    $query->the_post();
+                    $post_id = get_the_ID();
+
+                    // Update post data
+                    wp_update_post( array(
+                        'ID'           => $post_id,
+                        'post_title'   => $physician_data['post_title'],
+                        'post_content' => $physician_data['post_content'],
+                    ) );
+
+                    // Update ACF fields
+                    foreach ( $physician_data as $key => $value ) {
+                        if ( strpos($key, 'post_') !== 0 && $key !== 'unique_physician_id' ) {
+                            update_field( $key, $value, $post_id );
+                        }
+                    }
+                    $updated_count++;
+                }
+                wp_reset_postdata();
+            }
+            $page++;
         }
 
-        add_settings_error('koc_sync_settings', 'sync_success', 'Sync from queue completed. ' . $updated_count . ' physicians updated.', 'updated');
+        add_settings_error('koc_sync_settings', 'sync_success', 'Full sync completed. ' . $updated_count . ' physicians updated.', 'updated');
     }
 
     public function purge_sync_queue() {
@@ -289,8 +320,32 @@ Action completed successfully.
 
     // Save Sync Interval if not a child site
     if ( ! $is_child_site && isset( $_POST['sync_interval'] ) ) {
-        $sync_interval = sanitize_text_field( $_POST['sync_interval'] );
-        update_option( 'koc_physician_sync_interval', $sync_interval );
+        $new_interval = sanitize_text_field( $_POST['sync_interval'] );
+        $old_interval = get_option( 'koc_physician_sync_interval', '8_hours' );
+
+        if ( $new_interval !== $old_interval ) {
+            $timestamp = wp_next_scheduled( 'koc_scheduled_queue_sync_event' );
+            if ( $timestamp ) {
+                wp_unschedule_event( $timestamp, 'koc_scheduled_queue_sync_event' );
+            }
+        }
+
+        update_option( 'koc_physician_sync_interval', $new_interval );
+    }
+
+    // Clear schedule if it's now a parent site
+    $old_is_child = $this->child_site_option;
+    if ( ! $is_child_site && $old_is_child ) {
+        $timestamp = wp_next_scheduled( 'koc_scheduled_queue_sync_event' );
+        if ( $timestamp ) {
+            wp_unschedule_event( $timestamp, 'koc_scheduled_queue_sync_event' );
+        }
+    }
+
+    // Schedule event if it's a child site and the event is not already scheduled
+    if ( $is_child_site && ! wp_next_scheduled( 'koc_scheduled_queue_sync_event' ) ) {
+        $interval = get_option( 'koc_physician_sync_interval', '8_hours' );
+        wp_schedule_event( time(), $interval, 'koc_scheduled_queue_sync_event' );
     }
 
     add_settings_error('koc_sync_settings', 'settings_saved', 'Settings saved successfully.', 'success');

@@ -81,7 +81,89 @@ class Koc_Physician_Network_Sync {
 				$this->define_acf_hooks();
 				$this->define_api_hooks();
 				$this->define_post_save_hooks();
+				$this->define_cron_hooks();
 		
+			}
+
+			private function define_cron_hooks() {
+				$this->loader->add_filter( 'cron_schedules', $this, 'add_custom_cron_schedules' );
+				$this->loader->add_action( 'koc_scheduled_queue_sync_event', $this, 'run_scheduled_queue_sync' );
+			}
+
+			public function add_custom_cron_schedules( $schedules ) {
+				$schedules['one_hour'] = array(
+					'interval' => 3600,
+					'display'  => esc_html__( 'Every Hour' ),
+				);
+				$schedules['four_hours'] = array(
+					'interval' => 14400,
+					'display'  => esc_html__( 'Every Four Hours' ),
+				);
+				$schedules['eight_hours'] = array(
+					'interval' => 28800,
+					'display'  => esc_html__( 'Every Eight Hours' ),
+				);
+				return $schedules;
+			}
+
+			public function run_scheduled_queue_sync() {
+				$is_child = get_option( 'koc_physician_sync_is_child_site', false );
+				if ( ! $is_child ) return;
+
+				$parent_url = get_option( 'koc_physician_sync_parent_url' );
+		        $secret_key = get_option( 'koc_physician_sync_secret_key' );
+
+		        if ( ! $parent_url || ! $secret_key ) return;
+
+		        $api_url = trailingslashit( $parent_url ) . 'wp-json/koc-sync/v1/physicians/queue';
+
+		        $response = wp_remote_get( $api_url, array(
+		            'headers' => array(
+		                'X-Auth-Secret' => $secret_key,
+		                'Referer' => site_url(),
+		            ),
+		        ));
+
+		        if ( is_wp_error( $response ) ) return;
+
+		        $body = wp_remote_retrieve_body( $response );
+		        $data = json_decode( $body, true );
+
+		        if ( ! isset( $data['data'] ) ) return;
+
+		        $physicians = $data['data'];
+
+		        foreach ( $physicians as $physician_data ) {
+		            $args = array(
+		                'post_type' => 'physician',
+		                'meta_query' => array(
+		                    array(
+		                        'key'   => 'unique_physician_id',
+		                        'value' => $physician_data['unique_physician_id'],
+		                    ),
+		                ),
+		                'posts_per_page' => 1,
+		            );
+		            $query = new WP_Query( $args );
+
+		            if ( $query->have_posts() ) {
+		                $query->the_post();
+		                $post_id = get_the_ID();
+
+		                wp_update_post( array(
+		                    'ID'           => $post_id,
+		                    'post_title'   => $physician_data['post_title'],
+		                    'post_content' => $physician_data['post_content'],
+		                ) );
+
+		                foreach ( $physician_data as $key => $value ) {
+		                    if ( strpos($key, 'post_') !== 0 && $key !== 'unique_physician_id' ) {
+		                        update_field( $key, $value, $post_id );
+		                    }
+		                }
+		            }
+		            wp_reset_postdata();
+		        }
 			}
 
 			/**
