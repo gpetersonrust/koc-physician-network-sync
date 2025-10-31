@@ -77,128 +77,144 @@ class Koc_Physician_Network_Sync {
 		$this->load_dependencies();
 		$this->set_locale();
 		$this->define_admin_hooks();
-		$this->define_public_hooks();
-		$this->define_acf_hooks();
-
-	}
-
-	/**
-	 * Load the required dependencies for this plugin.
-	 *
-	 * Include the following files that make up the plugin:
-	 *
-	 * - Koc_Physician_Network_Sync_Loader. Orchestrates the hooks of the plugin.
-	 * - Koc_Physician_Network_Sync_i18n. Defines internationalization functionality.
-	 * - Koc_Physician_Network_Sync_Admin. Defines all hooks for the admin area.
-	 * - Koc_Physician_Network_Sync_Public. Defines all hooks for the public side of the site.
-	 *
-	 * Create an instance of the loader which will be used to register the hooks
-	 * with WordPress.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 */
-	private function load_dependencies() {
-
-		/**
-		 * The class responsible for orchestrating the actions and filters of the
-		 * core plugin.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-loader.php';
-
-		/**
-		 * The class responsible for defining internationalization functionality
-		 * of the plugin.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-i18n.php';
-
-		/**
-		 * The class responsible for defining all actions that occur in the admin area.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-koc-physician-network-sync-admin.php';
-
-		/**
-		 * The class responsible for defining all actions that occur in the public-facing
-		 * side of the site.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-koc-physician-network-sync-public.php';
-        // require includes/class-koc-physician-network-sync-source.php 
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-source.php';
-
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-acf-manager.php';
-
-
-
-		$sync_source = new KOC_Physician_Network_Sync_Source();
-
-
+				$this->define_public_hooks();
+				$this->define_acf_hooks();
+				$this->define_api_hooks();
 		
-
-		$this->loader = new Koc_Physician_Network_Sync_Loader();
-
-		$this->loader->add_action('admin_menu', $sync_source, 'add_plugin_admin_menu');
-
-	}
-
-	/**
-	 * Define the locale for this plugin for internationalization.
-	 *
-	 * Uses the Koc_Physician_Network_Sync_i18n class in order to set the domain and to register the hook
-	 * with WordPress.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 */
-	private function set_locale() {
-
-		$plugin_i18n = new Koc_Physician_Network_Sync_i18n();
-
-		$this->loader->add_action( 'plugins_loaded', $plugin_i18n, 'load_plugin_textdomain' );
-
-	}
-
-	/**
-	 * Register all of the hooks related to the admin area functionality
-	 * of the plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 */
-	private function define_admin_hooks() {
-
-		$plugin_admin = new Koc_Physician_Network_Sync_Admin( $this->get_plugin_name(), $this->get_version() );
-
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
-
-	}
-
-	/**
-	 * Register all of the hooks related to the public-facing functionality
-	 * of the plugin.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 */
-	private function define_public_hooks() {
-
-		$plugin_public = new Koc_Physician_Network_Sync_Public( $this->get_plugin_name(), $this->get_version() );
-
-		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
-		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
-
-	}
-
-	/**
-	 * Register all of the hooks related to ACF functionality.
-	 *
-	 * @since    1.0.0
-	 * @access   private
-	 */
-	private function define_acf_hooks() {
-		$acf_manager = new KOC_Physician_ACF_Manager();
-		$this->loader->add_action( 'acf/init', $acf_manager, 'register_field_groups' );
-	}
+			}
+		
+			/**
+			 * Load the required dependencies for this plugin.
+			 *
+			 * Include the following files that make up the plugin:
+			 *
+			 * - Koc_Physician_Network_Sync_Loader. Orchestrates the hooks of the plugin.
+			 * - Koc_Physician_Network_Sync_i18n. Defines internationalization functionality.
+			 * - Koc_Physician_Network_Sync_Admin. Defines all hooks for the admin area.
+			 * - Koc_Physician_Network_Sync_Public. Defines all hooks for the public side of the site.
+			 *
+			 * Create an instance of the loader which will be used to register the hooks
+			 * with WordPress.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function load_dependencies() {
+		
+				/**
+				 * The class responsible for orchestrating the actions and filters of the
+				 * core plugin.
+				 */
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-loader.php';
+		
+				/**
+				 * The class responsible for defining internationalization functionality
+				 * of the plugin.
+				 */		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-i18n.php';
+		
+				/**
+				 * The class responsible for defining all actions that occur in the admin area.
+				 */
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-koc-physician-network-sync-admin.php';
+		
+				/**
+				 * The class responsible for defining all actions that occur in the public-facing
+				 * side of the site.
+				 */
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-koc-physician-network-sync-public.php';
+		        // require includes/class-koc-physician-network-sync-source.php 
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-source.php';
+		
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-acf-manager.php';
+		
+				/**
+				 * The class responsible for defining all API routes.
+				 */
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-api.php';
+		
+		
+		
+				$sync_source = new KOC_Physician_Network_Sync_Source();
+		
+		
+				
+		
+				$this->loader = new Koc_Physician_Network_Sync_Loader();
+		
+				$this->loader->add_action('admin_menu', $sync_source, 'add_plugin_admin_menu');
+		
+			}
+		
+			/**
+			 * Define the locale for this plugin for internationalization.
+			 *
+			 * Uses the Koc_Physician_Network_Sync_i18n class in order to set the domain and to register the hook
+			 * with WordPress.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function set_locale() {
+		
+				$plugin_i18n = new Koc_Physician_Network_Sync_i18n();
+		
+				$this->loader->add_action( 'plugins_loaded', $plugin_i18n, 'load_plugin_textdomain' );
+		
+			}
+		
+			/**
+			 * Register all of the hooks related to the admin area functionality
+			 * of the plugin.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function define_admin_hooks() {
+		
+				$plugin_admin = new Koc_Physician_Network_Sync_Admin( $this->get_plugin_name(), $this->get_version() );
+		
+				$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
+				$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
+		
+			}
+		
+			/**
+			 * Register all of the hooks related to the public-facing functionality
+			 * of the plugin.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function define_public_hooks() {
+		
+				$plugin_public = new Koc_Physician_Network_Sync_Public( $this->get_plugin_name(), $this->get_version() );
+		
+				$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
+				$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
+		
+			}
+		
+			/**
+			 * Register all of the hooks related to ACF functionality.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function define_acf_hooks() {
+				$acf_manager = new KOC_Physician_ACF_Manager();
+				$this->loader->add_action( 'acf/init', $acf_manager, 'register_field_groups' );
+			}
+		
+			/**
+			 * Register all of the hooks related to the API functionality.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function define_api_hooks() {
+				$api = new Koc_Physician_Network_Sync_Api();
+				$this->loader->add_action( 'rest_api_init', $api, 'register_routes' );
+			}
 
 
 
