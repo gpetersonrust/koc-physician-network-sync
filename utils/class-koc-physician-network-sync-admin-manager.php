@@ -7,6 +7,7 @@ class Physician_Network_Sync_Admin_Manager  {
     public $secret_key;
     public $last_update_date;
     public $sync_interval;
+    public $parent_url;
 
     public function __construct() {
         // Constructor is empty, form handling is hooked into admin_init.
@@ -33,6 +34,7 @@ class Physician_Network_Sync_Admin_Manager  {
         $this->secret_key = get_option('koc_physician_sync_secret_key', '');
         $this->last_update_date = get_option('koc_physician_sync_last_update_date', '');
         $this->sync_interval = get_option('koc_physician_sync_interval', '8 hours');
+        $this->parent_url = get_option('koc_physician_sync_parent_url', '');
     }
 
 public function dynamic_post_button($action, $class_function, $nonce_label, $button_text){ ?>
@@ -105,6 +107,82 @@ Action completed successfully.
     }
     wp_reset_postdata();
 }
+
+    public function sync_from_queue() {
+        $parent_url = get_option( 'koc_physician_sync_parent_url' );
+        $secret_key = get_option( 'koc_physician_sync_secret_key' );
+
+        if ( ! $parent_url || ! $secret_key ) {
+            add_settings_error('koc_sync_settings', 'missing_credentials', 'Parent Site URL and Secret Key are required for sync.', 'error');
+            return;
+        }
+
+        $api_url = trailingslashit( $parent_url ) . 'wp-json/koc-sync/v1/physicians/queue';
+
+        $response = wp_remote_get( $api_url, array(
+            'headers' => array(
+                'X-Auth-Secret' => $secret_key,
+                'Referer' => site_url(),
+            ),
+        ));
+
+        if ( is_wp_error( $response ) ) {
+            add_settings_error('koc_sync_settings', 'api_error', 'API Request Error: ' . $response->get_error_message(), 'error');
+            return;
+        }
+
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+
+        if ( ! isset( $data['data'] ) ) {
+            add_settings_error('koc_sync_settings', 'api_data_error', 'Invalid data received from parent site.', 'error');
+            return;
+        }
+
+        $physicians = $data['data'];
+        $updated_count = 0;
+
+        foreach ( $physicians as $physician_data ) {
+            $args = array(
+                'post_type' => 'physician',
+                'meta_query' => array(
+                    array(
+                        'key'   => 'unique_physician_id',
+                        'value' => $physician_data['unique_physician_id'],
+                    ),
+                ),
+                'posts_per_page' => 1,
+            );
+            $query = new WP_Query( $args );
+
+            if ( $query->have_posts() ) {
+                $query->the_post();
+                $post_id = get_the_ID();
+
+                // Update post data
+                wp_update_post( array(
+                    'ID'           => $post_id,
+                    'post_title'   => $physician_data['post_title'],
+                    'post_content' => $physician_data['post_content'],
+                ) );
+
+                // Update ACF fields
+                foreach ( $physician_data as $key => $value ) {
+                    if ( strpos($key, 'post_') !== 0 && $key !== 'unique_physician_id' ) {
+                        update_field( $key, $value, $post_id );
+                    }
+                }
+                $updated_count++;
+            }
+            wp_reset_postdata();
+        }
+
+        add_settings_error('koc_sync_settings', 'sync_success', 'Sync from queue completed. ' . $updated_count . ' physicians updated.', 'updated');
+    }
+
+    public function purge_sync_queue() {
+        delete_option( 'koc_sync_physician_queue' );
+    }
 
 
     public function export_physician_data() {
@@ -188,6 +266,11 @@ Action completed successfully.
     if ( isset( $_POST['secret_key'] ) && ! empty( $_POST['secret_key'] ) ) {
         $secret_key = sanitize_text_field( $_POST['secret_key'] );
         update_option( 'koc_physician_sync_secret_key', $secret_key );
+    }
+
+    if ( isset( $_POST['parent_url'] ) ) {
+        $parent_url = sanitize_text_field( $_POST['parent_url'] );
+        update_option( 'koc_physician_sync_parent_url', $parent_url );
     }
 
     // Save Domain Allow List if not a child site

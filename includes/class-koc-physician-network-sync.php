@@ -80,7 +80,43 @@ class Koc_Physician_Network_Sync {
 				$this->define_public_hooks();
 				$this->define_acf_hooks();
 				$this->define_api_hooks();
+				$this->define_post_save_hooks();
 		
+			}
+
+			/**
+			 * Register hooks related to saving posts.
+			 *
+			 * @since    1.0.0
+			 * @access   private
+			 */
+			private function define_post_save_hooks() {
+				$this->loader->add_action( 'save_post_physician', $this, 'add_physician_to_sync_queue', 10, 2 );
+			}
+
+			/**
+			 * Add a physician post ID to the sync queue.
+			 *
+			 * @since    1.0.0
+			 * @param    int    $post_id    The ID of the post being saved.
+			 * @param    WP_Post $post      The post object.
+			 */
+			public function add_physician_to_sync_queue( $post_id, $post ) {
+			    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			        return;
+			    }
+			    if ( wp_is_post_revision( $post_id ) ) {
+			        return;
+			    }
+			    if ( $post->post_status !== 'publish' ) {
+			        return;
+			    }
+
+			    $queue = get_option( 'koc_sync_physician_queue', array() );
+			    if ( ! in_array( $post_id, $queue ) ) {
+			        $queue[] = $post_id;
+			        update_option( 'koc_sync_physician_queue', $queue );
+			    }
 			}
 		
 			/**

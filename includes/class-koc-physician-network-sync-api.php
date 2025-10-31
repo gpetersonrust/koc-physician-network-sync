@@ -55,6 +55,44 @@ class Koc_Physician_Network_Sync_Api {
 			'callback'            => array( $this, 'get_physician' ),
 			'permission_callback' => array( $this, 'permissions_check' ),
 		) );
+
+		register_rest_route( $this->namespace, '/physicians/queue', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( $this, 'get_queued_physicians' ),
+			'permission_callback' => array( $this, 'permissions_check' ),
+		) );
+	}
+
+	/**
+	 * Get a collection of queued physicians
+	 *
+	 * @param WP_REST_Request $request Full data about the request.
+	 * @return WP_Error|WP_REST_Response
+	 */
+	public function get_queued_physicians( $request ) {
+		$queued_ids = get_option( 'koc_sync_physician_queue', array() );
+
+		if ( empty( $queued_ids ) ) {
+			return new WP_REST_Response( array( 'data' => array() ) );
+		}
+
+		$args = array(
+			'post_type'      => 'physician',
+			'posts_per_page' => -1,
+			'post__in'       => $queued_ids,
+			'orderby'        => 'post__in',
+		);
+
+		$query = new WP_Query( $args );
+		$physician_data = array();
+
+		while ( $query->have_posts() ) {
+			$query->the_post();
+			$physician_data[] = $this->get_physician_data( get_the_ID() );
+		}
+		wp_reset_postdata();
+
+		return new WP_REST_Response( array( 'data' => $physician_data ) );
 	}
 
 	/**

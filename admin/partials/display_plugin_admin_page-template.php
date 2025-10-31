@@ -76,6 +76,11 @@ $admin_manager->load_settings();
              
                <!-- only use on child sites -->
                <?php if ( $admin_manager->child_site_option ) : ?>
+            <div class="form-group">
+                <label for="parent_url">Parent Site URL:</label>
+                <input type="text" name="parent_url" id="parent_url" value="<?php echo esc_attr( $admin_manager->parent_url ); ?>" />
+            </div>
+
              <div class="form-group">
               <label for="last_update_date">Last Update Date:</label>
               <input type="date" name="last_update_date" id="last_update_date" value="<?php echo esc_attr( $admin_manager->last_update_date ); ?>" />
@@ -98,6 +103,20 @@ $admin_manager->load_settings();
         <?php wp_nonce_field( 'save_koc_physician_sync_settings_action', 'save_koc_physician_sync_settings_nonce' ); ?>
         <input type="submit" value="Save Settings" class="button button-primary" />
    </form>
+
+    <?php if ( $admin_manager->child_site_option ) : ?>
+        <div class="action-buttons">
+            <?php
+            $admin_manager->dynamic_post_button(
+                'sync_from_queue',
+                'sync_from_queue',
+                'sync_from_queue',
+                'Sync from Queue'
+            );
+            ?>
+        </div>
+    <?php endif; ?>
+
     <?php
       // Generate Secret Key Button if not present or if not a child site
     if ( ! $admin_manager->child_site_option || empty( $admin_manager->secret_key ) ) : ?>
@@ -125,6 +144,14 @@ $admin_manager->load_settings();
       'generate_secret_key',
       'generate_secret_key',
       'Copy Secret Key'
+    );
+
+    // Purge Sync Queue
+    $admin_manager->dynamic_post_button(
+      'purge_sync_queue',
+      'purge_sync_queue',
+      'purge_sync_queue',
+      'Purge Sync Queue'
     );
     ?>
   </div>
