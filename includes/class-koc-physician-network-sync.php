@@ -124,6 +124,8 @@ class Koc_Physician_Network_Sync {
 				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-koc-physician-network-sync-public.php';
 		        // require includes/class-koc-physician-network-sync-source.php 
 				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-network-sync-source.php';
+
+				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'utils/class-koc-physician-network-sync-admin-manager.php';
 		
 				require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-koc-physician-acf-manager.php';
 		
@@ -172,7 +174,9 @@ class Koc_Physician_Network_Sync {
 			private function define_admin_hooks() {
 		
 				$plugin_admin = new Koc_Physician_Network_Sync_Admin( $this->get_plugin_name(), $this->get_version() );
-		
+				$admin_manager = new Physician_Network_Sync_Admin_Manager();
+
+				$this->loader->add_action( 'admin_init', $admin_manager, 'handle_form_submissions' );
 				$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 				$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
 		

@@ -6,17 +6,24 @@ class Physician_Network_Sync_Admin_Manager  {
     public $domain_allow_list;
     public $secret_key;
     public $last_update_date;
+    public $sync_interval;
 
     public function __construct() {
-        $this->load_settings();
+        // Constructor is empty, form handling is hooked into admin_init.
+    }
 
-        if (isset($_POST['action'])) {
-            if ($_POST['action'] == 'save_koc_physician_sync_settings') {
-                $this->save_settings();
-                $this->load_settings(); // Reload settings after saving
-            } else {
-                $this->proccess_dynamic_post_button();
-            }
+    public function handle_form_submissions() {
+        if ( ! isset( $_POST['action'] ) || ! isset( $_GET['page'] ) || $_GET['page'] !== 'koc-physician-network-sync' ) {
+            return;
+        }
+
+        
+
+        if ( $_POST['action'] == 'save_koc_physician_sync_settings' ) {
+            
+            $this->save_settings();
+        } else {
+            $this->proccess_dynamic_post_button();
         }
     }
 
@@ -25,6 +32,7 @@ class Physician_Network_Sync_Admin_Manager  {
         $this->domain_allow_list = get_option('koc_physician_sync_domain_allow_list', array());
         $this->secret_key = get_option('koc_physician_sync_secret_key', '');
         $this->last_update_date = get_option('koc_physician_sync_last_update_date', '');
+        $this->sync_interval = get_option('koc_physician_sync_interval', '8 hours');
     }
 
 public function dynamic_post_button($action, $class_function, $nonce_label, $button_text){ ?>
@@ -168,7 +176,7 @@ Action completed successfully.
  public function save_settings() {
     // Verify nonce
     if ( ! isset( $_POST['save_koc_physician_sync_settings_nonce'] ) || ! wp_verify_nonce( $_POST['save_koc_physician_sync_settings_nonce'], 'save_koc_physician_sync_settings_action' ) ) {
-        echo '<div class="notice notice-error is-dismissible"><p>Security check failed. Settings not saved.</p></div>';
+        add_settings_error('koc_sync_settings', 'nonce_fail', 'Security check failed. Settings not saved.', 'error');
         return;
     }
 
@@ -186,6 +194,8 @@ Action completed successfully.
     if ( ! $is_child_site && isset( $_POST['domain_allow_list'] ) ) {
         $domains = array_map( 'trim', explode( ',', sanitize_text_field( $_POST['domain_allow_list'] ) ) );
         update_option( 'koc_physician_sync_domain_allow_list', $domains );
+    } else if ( $is_child_site ) {
+        update_option( 'koc_physician_sync_domain_allow_list', array() );
     }
 
     // Save Last Update Date if not a child site
@@ -194,7 +204,13 @@ Action completed successfully.
         update_option( 'koc_physician_sync_last_update_date', $last_update_date );
     }
 
-    echo '<div class="notice notice-success is-dismissible"><p>Settings saved successfully.</p></div>';
+    // Save Sync Interval if not a child site
+    if ( ! $is_child_site && isset( $_POST['sync_interval'] ) ) {
+        $sync_interval = sanitize_text_field( $_POST['sync_interval'] );
+        update_option( 'koc_physician_sync_interval', $sync_interval );
+    }
+
+    add_settings_error('koc_sync_settings', 'settings_saved', 'Settings saved successfully.', 'success');
 }
 }
 ?>
