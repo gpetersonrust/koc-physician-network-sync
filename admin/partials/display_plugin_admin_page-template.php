@@ -89,10 +89,9 @@ $admin_manager->load_settings();
         <div class="form-group">
             <label for="sync_interval">Sync Interval:</label>
             <select name="sync_interval" id="sync_interval">
-                <option value="1_hour" <?php selected( $admin_manager->sync_interval, '1_hour' ); ?>>1 hour</option>
-                <option value="4_hours" <?php selected( $admin_manager->sync_interval, '4_hours' ); ?>>4 hours</option>
-                <option value="8_hours" <?php selected( $admin_manager->sync_interval, '8_hours' ); ?>>8 hours</option>
-                <option value="1_day" <?php selected( $admin_manager->sync_interval, '1_day' ); ?>>1 day</option>
+                <option value="one_hour" <?php selected( $admin_manager->sync_interval, 'one_hour' ); ?>>1 hour</option>
+                <option value="four_hours" <?php selected( $admin_manager->sync_interval, 'four_hours' ); ?>>4 hours</option>
+                <option value="eight_hours" <?php selected( $admin_manager->sync_interval, 'eight_hours' ); ?>>8 hours</option>
             </select>
         </div>
         <?php endif; ?>
